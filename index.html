@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>抽卡紀錄系統</title>
+<title>未定事件簿抽卡紀錄</title>
 
 <style>
 body {
@@ -11,240 +11,246 @@ body {
   padding: 20px;
 }
 
-h2 {
-  text-align: center;
-}
+h2 { text-align:center; }
 
-input, select {
+input, select, button {
   margin: 5px;
-  padding: 5px;
-}
-
-button {
-  margin: 5px;
-  padding: 6px 10px;
-  cursor: pointer;
+  padding: 6px;
 }
 
 table {
   width: 100%;
-  margin-top: 20px;
   border-collapse: collapse;
+  margin-top: 20px;
 }
 
-td, th {
+th, td {
   border: 1px solid #ccc;
   padding: 8px;
   text-align: center;
 }
 
 /* 男主顏色 */
-.夏彥 { color: #FFC107; font-weight: bold; }
-.左然 { color: #F44336; font-weight: bold; }
-.莫弈 { color: #4CAF50; font-weight: bold; }
-.陸景和 { color: #CE93D8; font-weight: bold; }
+.xia { color:#FFC107; font-weight:bold; }
+.zuo { color:#E53935; font-weight:bold; }
+.mo  { color:#43A047; font-weight:bold; }
+.lu  { color:#BA68C8; font-weight:bold; }
+
+.status {
+  margin-top: 10px;
+  font-weight: bold;
+}
 </style>
 </head>
 
 <body>
 
-<h2>🎴 抽卡紀錄</h2>
+<h2>🎴 未定事件簿抽卡紀錄系統</h2>
 
-<!-- 輸入區 -->
-<div>
-  活動區間：
-  <input type="date" id="startDate">
-  ～ 
-  <input type="date" id="endDate">
+<button onclick="resetAll()">🔄 重置全部</button>
 
-  <br>
+<div class="status" id="status"></div>
 
-  角色：
-  <select id="character">
-    <option>夏彥</option>
-    <option>左然</option>
-    <option>莫弈</option>
-    <option>陸景和</option>
-  </select>
+活動開始：
+<input type="date" id="start">
 
-  卡池名稱：
-  <input type="text" id="pool">
+活動結束：
+<input type="date" id="end"><br>
 
-  卡片名稱：
-  <input type="text" id="card">
+角色：
+<select id="role">
+  <option>夏彥</option>
+  <option>左然</option>
+  <option>莫弈</option>
+  <option>陸景和</option>
+</select>
 
-  卡面等級：
-  <select id="rarity">
-    <option>SSR</option>
-    <option>SSS</option>
-  </select>
+卡池名稱：
+<input type="text" id="pool">
 
-  是否活動卡：
-  <select id="isEvent">
-    <option>是</option>
-    <option>否</option>
-  </select>
+卡片名稱：
+<input type="text" id="card">
 
-  已抽次數：
-  <input type="number" id="draws">
+等級：
+<select id="rarity">
+  <option>SSR</option>
+  <option>SSS</option>
+</select>
 
-  <button onclick="addRecord()">新增</button>
-</div>
+是否活動卡：
+<select id="event">
+  <option>是</option>
+  <option>否</option>
+</select>
 
-<!-- 表格 -->
+已抽：
+<input type="number" id="count">
+
+<button onclick="addRecord()">新增</button>
+
+<h3 id="pityDisplay"></h3>
+
 <table>
-  <thead>
-    <tr>
-      <th>活動區間</th>
-      <th>角色</th>
-      <th>卡池</th>
-      <th>卡片</th>
-      <th>等級</th>
-      <th>活動卡</th>
-      <th>已抽</th>
-      <th>剩餘保底</th>
-      <th>操作</th>
-    </tr>
-  </thead>
-  <tbody id="tableBody"></tbody>
+<thead>
+<tr>
+<th>活動區間</th>
+<th>角色</th>
+<th>卡池</th>
+<th>卡片</th>
+<th>等級</th>
+<th>抽數</th>
+<th>剩餘保底</th>
+<th>操作</th>
+</tr>
+</thead>
+
+<tbody id="list"></tbody>
 </table>
 
 <script>
-let records = JSON.parse(localStorage.getItem("gachaRecords")) || [];
+// ===== 資料 =====
+let data = JSON.parse(localStorage.getItem("gachaData")) || [];
 
-let pity = {
-  SSR: Number(localStorage.getItem("pitySSR")) || 0,
-  SSS: Number(localStorage.getItem("pitySSS")) || 0
-};
-
-function saveData() {
-  localStorage.setItem("gachaRecords", JSON.stringify(records));
-  localStorage.setItem("pitySSR", pity.SSR);
-  localStorage.setItem("pitySSS", pity.SSS);
+// ===== 男主顏色 =====
+function getColor(role){
+  return {
+    "夏彥":"xia",
+    "左然":"zuo",
+    "莫弈":"mo",
+    "陸景和":"lu"
+  }[role];
 }
 
-function calculatePity(record) {
-  let current = record.rarity === "SSR" ? pity.SSR : pity.SSS;
+// ===== ⭐ 核心：重算全部保底 =====
+function recalcAll(){
+  let pity = { SSR: 100, SSS: 100 };
 
-  let total = current + Number(record.draws);
-  let remain = 100 - total;
+  data.forEach(d=>{
+    let remain = pity[d.rarity];
+    let count = d.count;
 
-  if (record.isEvent === "是") {
-    pity[record.rarity] = 0;
-  } else {
-    pity[record.rarity] = total;
-  }
+    if(count >= remain){
+      count -= remain;
+      let newRemain = 100 - (count % 100);
+      pity[d.rarity] = newRemain === 100 ? 100 : newRemain;
+    } else {
+      pity[d.rarity] = remain - count;
+    }
 
-  return remain < 0 ? 0 : remain;
+    d.remain = pity[d.rarity];
+  });
+
+  return pity;
 }
 
-function addRecord() {
-  let start = document.getElementById("startDate").value;
-  let end = document.getElementById("endDate").value;
-
-  if (!start || !end) {
-    alert("請選擇活動日期！");
-    return;
-  }
-
-  if (new Date(start) > new Date(end)) {
-    alert("開始日期不能大於結束日期！");
-    return;
-  }
-
-  let record = {
-    eventRange: start + " - " + end,
-    character: document.getElementById("character").value,
-    pool: document.getElementById("pool").value,
-    card: document.getElementById("card").value,
-    rarity: document.getElementById("rarity").value,
-    isEvent: document.getElementById("isEvent").value,
-    draws: document.getElementById("draws").value
+// ===== 新增 =====
+function addRecord(){
+  let d = {
+    start: startInput.value,
+    end: endInput.value,
+    role: roleInput.value,
+    pool: poolInput.value,
+    card: cardInput.value,
+    rarity: rarityInput.value,
+    event: eventInput.value,
+    count: parseInt(countInput.value)
   };
 
-  record.remain = calculatePity(record);
+  if(!d.count) return alert("請輸入抽數");
 
-  records.push(record);
-  saveData();
+  data.push(d);
+  save();
   render();
 }
 
-function deleteRecord(index) {
-  records.splice(index, 1);
-  saveData();
-  render();
-}
+// ===== 顯示 =====
+function render(){
+  let pity = recalcAll();
 
-function editRecord(index) {
-  let r = records[index];
+  list.innerHTML = "";
 
-  let dates = r.eventRange.split("-");
-  if (dates.length === 2) {
-    document.getElementById("startDate").value = dates[0].trim();
-    document.getElementById("endDate").value = dates[1].trim();
-  }
-
-  document.getElementById("character").value = r.character;
-  document.getElementById("pool").value = r.pool;
-  document.getElementById("card").value = r.card;
-  document.getElementById("rarity").value = r.rarity;
-  document.getElementById("isEvent").value = r.isEvent;
-  document.getElementById("draws").value = r.draws;
-
-  deleteRecord(index);
-}
-
-function render() {
-  let tbody = document.getElementById("tableBody");
-  tbody.innerHTML = "";
-
-  records.forEach((r, i) => {
-    let row = `
+  data.forEach((d,i)=>{
+    list.innerHTML += `
       <tr>
-        <td>${r.eventRange}</td>
-        <td class="${r.character}">${r.character}</td>
-        <td>${r.pool}</td>
-        <td>${r.card}</td>
-        <td>${r.rarity}</td>
-        <td>${r.isEvent}</td>
-        <td>${r.draws}</td>
-        <td>${r.remain}</td>
+        <td>${d.start} ~ ${d.end}</td>
+        <td class="${getColor(d.role)}">${d.role}</td>
+        <td>${d.pool}</td>
+        <td>${d.card}</td>
+        <td>${d.rarity}</td>
+        <td>${d.count}</td>
+        <td>${d.remain}</td>
         <td>
-          <button onclick="editRecord(${i})">編輯</button>
-          <button onclick="deleteRecord(${i})">刪除</button>
+          <button onclick="edit(${i})">編輯</button>
+          <button onclick="del(${i})">刪除</button>
         </td>
       </tr>
     `;
-    tbody.innerHTML += row;
-  });
-}
-
-/* 活動結束自動繼承 */
-function autoCarryOver() {
-  let today = new Date();
-
-  records.forEach(r => {
-    let dates = r.eventRange.split("-");
-    if (dates.length === 2) {
-      let endDate = new Date(dates[1].trim());
-
-      if (today > endDate && !r.processed) {
-        if (r.rarity === "SSR") {
-          pity.SSR = 100 - r.remain;
-        } else {
-          pity.SSS = 100 - r.remain;
-        }
-        r.processed = true;
-      }
-    }
   });
 
-  saveData();
+  pityDisplay.innerHTML =
+    `SSR剩餘：${pity.SSR} ｜ SSS剩餘：${pity.SSS}`;
+
+  status.innerHTML =
+    data.length === 0
+    ? "🟢 全新紀錄（100保底）"
+    : "🟡 已依所有紀錄自動重算保底";
 }
 
-autoCarryOver();
+// ===== 刪除 =====
+function del(i){
+  if(confirm("確定刪除？")){
+    data.splice(i,1);
+    save();
+    render();
+  }
+}
+
+// ===== 編輯 =====
+function edit(i){
+  let d = data[i];
+
+  startInput.value = d.start;
+  endInput.value = d.end;
+  roleInput.value = d.role;
+  poolInput.value = d.pool;
+  cardInput.value = d.card;
+  rarityInput.value = d.rarity;
+  eventInput.value = d.event;
+  countInput.value = d.count;
+
+  data.splice(i,1);
+  save();
+  render();
+}
+
+// ===== 儲存 =====
+function save(){
+  localStorage.setItem("gachaData", JSON.stringify(data));
+}
+
+// ===== 重置 =====
+function resetAll(){
+  if(confirm("確定全部清除？")){
+    localStorage.clear();
+    location.reload();
+  }
+}
+
+// ===== DOM =====
+const startInput = document.getElementById("start");
+const endInput = document.getElementById("end");
+const roleInput = document.getElementById("role");
+const poolInput = document.getElementById("pool");
+const cardInput = document.getElementById("card");
+const rarityInput = document.getElementById("rarity");
+const eventInput = document.getElementById("event");
+const countInput = document.getElementById("count");
+const list = document.getElementById("list");
+const pityDisplay = document.getElementById("pityDisplay");
+const status = document.getElementById("status");
+
+// ===== 啟動 =====
 render();
-
 </script>
 
 </body>
