@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<title>抽卡紀錄</title>
+<style>
+  body { font-family: Arial, sans-serif; background-color: #F3E5F5; padding: 20px; }
+  h1 { text-align: center; color: #4A148C; }
+  label { display: block; margin-top: 10px; }
+  input, select, button { padding: 5px; margin-top: 5px; width: 200px; }
+  button { cursor: pointer; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+  th { background-color: #E1BEE7; }
+  .夏彥 { background-color: #FFD700; }
+  .左然 { background-color: #F44336; color: white; }
+  .莫弈 { background-color: #4CAF50; color: white; }
+  .陸景和 { background-color: #B39DDB; }
+  .progress-container { width: 100px; background-color: #ddd; border-radius: 5px; overflow: hidden; margin: 0 auto; }
+  .progress-bar { height: 10px; background-color: #4A148C; width: 0%; }
+  .total-row { background-color: #D1C4E9; font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>抽卡紀錄</h1>
+
+<div>
+  <label>活動開始日期: <input type="date" id="startDate" onchange="inheritPrevious()"></label>
+  <label>活動結束日期: <input type="date" id="endDate"></label>
+  
+  <label>男主:
+    <select id="hero">
+      <option value="夏彥">夏彥</option>
+      <option value="左然">左然</option>
+      <option value="莫弈">莫弈</option>
+      <option value="陸景和">陸景和</option>
+    </select>
+  </label>
+  
+  <label>卡池名稱: <input type="text" id="poolName" placeholder="自行輸入卡池名稱"></label>
+  <label>卡片名稱: <input type="text" id="cardName"></label>
+  <label>卡面等級:
+    <select id="rarity">
+      <option value="SSR">SSR</option>
+      <option value="SSS">SSS</option>
+    </select>
+  </label>
+  <label>是否為活動卡:
+    <select id="isEvent">
+      <option value="是">是</option>
+      <option value="否">否</option>
+    </select>
+  </label>
+  <label>已抽抽數: <input type="number" id="drawCount" min="1" value="1"></label>
+  
+  <button onclick="addRecord()">新增紀錄</button>
+</div>
+
+<table id="recordTable">
+  <thead>
+    <tr>
+      <th>活動區間</th>
+      <th>男主</th>
+      <th>卡池名稱</th>
+      <th>卡片名稱</th>
+      <th>卡面等級</th>
+      <th>是否為活動卡</th>
+      <th>已抽抽數</th>
+      <th>SSR保底剩餘</th>
+      <th>SSS保底剩餘</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+  <tfoot id="totalFooter">
+    <tr class="total-row">
+      <td colspan="6">本活動總抽數</td>
+      <td id="totalDraw">0</td>
+      <td id="totalSSR">0</td>
+      <td id="totalSSS">0</td>
+    </tr>
+  </tfoot>
+</table>
+
+<script>
+const MAX_COUNT = 100; // SSR/SSS 統一保底
+
+// 全部男主共用保底
+let sharedData = { SSR: 0, SSS: 0 };
+let previousData = { SSR: 0, SSS: 0 };
+
+function inheritPrevious() {
+  sharedData = { ...previousData };
+  updateTotals();
+}
+
+function addRecord() {
+  const start = document.getElementById('startDate').value;
+  const end = document.getElementById('endDate').value;
+  const hero = document.getElementById('hero').value;
+  const poolName = document.getElementById('poolName').value;
+  const cardName = document.getElementById('cardName').value;
+  const rarity = document.getElementById('rarity').value;
+  const isEvent = document.getElementById('isEvent').value;
+  const drawCount = parseInt(document.getElementById('drawCount').value);
+
+  if (isEvent === "是") {
+    sharedData[rarity] = drawCount; // 活動卡重置保底
+  } else {
+    sharedData[rarity] += drawCount; // 非活動卡累積
+  }
+
+  previousData = { ...sharedData }; // 繼承保底
+
+  const ssrRemain = Math.max(0, MAX_COUNT - sharedData.SSR);
+  const sssRemain = Math.max(0, MAX_COUNT - sharedData.SSS);
+
+  const ssrPercent = (ssrRemain / MAX_COUNT * 100).toFixed(0);
+  const sssPercent = (sssRemain / MAX_COUNT * 100).toFixed(0);
+
+  const table = document.getElementById('recordTable').querySelector('tbody');
+  const row = document.createElement('tr');
+  row.className = hero;
+  row.innerHTML = `
+    <td>${start} ~ ${end}</td>
+    <td>${hero}</td>
+    <td>${poolName}</td>
+    <td>${cardName}</td>
+    <td>${rarity}</td>
+    <td>${isEvent}</td>
+    <td>${drawCount}</td>
+    <td>${ssrRemain}
+      <div class="progress-container"><div class="progress-bar" style="width:${ssrPercent}%"></div></div>
+    </td>
+    <td>${sssRemain}
+      <div class="progress-container"><div class="progress-bar" style="width:${sssPercent}%"></div></div>
+    </td>
+  `;
+  table.appendChild(row);
+
+  document.getElementById('cardName').value = '';
+  document.getElementById('drawCount').value = 1;
+
+  updateTotals();
+}
+
+function updateTotals() {
+  const totalDraw = sharedData.SSR + sharedData.SSS;
+  document.getElementById('totalDraw').innerText = totalDraw;
+  document.getElementById('totalSSR').innerText = sharedData.SSR;
+  document.getElementById('totalSSS').innerText = sharedData.SSS;
+}
+</script>
+
+</body>
+</html>
