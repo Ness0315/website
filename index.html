@@ -1,10 +1,7 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
+<!DOCTYPE html><html lang="zh-TW">
 <head>
 <meta charset="UTF-8">
-<title>未定事件簿抽卡紀錄</title>
-
-<style>
+<title>未定事件簿抽卡紀錄</title><style>
 body {
   font-family: Arial;
   background: #F3E5F5;
@@ -40,57 +37,37 @@ th, td {
   margin-top: 10px;
   font-weight: bold;
 }
-</style>
-</head>
+</style></head><body><h2>🎴 未定事件簿抽卡紀錄系統</h2><button onclick="resetAll()">🔄 重置全部</button>
 
-<body>
+<!-- 匯出 / 匯入（放下面，維持原本排版） --><div class="status" id="status"></div>活動開始： <input type="date" id="start">
 
-<h2>🎴 未定事件簿抽卡紀錄系統</h2>
+活動結束： <input type="date" id="end"><br>
 
-<button onclick="resetAll()">🔄 重置全部</button>
+角色： <select id="role">
 
-<div class="status" id="status"></div>
-
-活動開始：
-<input type="date" id="start">
-
-活動結束：
-<input type="date" id="end"><br>
-
-角色：
-<select id="role">
   <option>夏彥</option>
   <option>左然</option>
   <option>莫弈</option>
   <option>陸景和</option>
-</select>
+</select>卡池名稱： <input type="text" id="pool">
 
-卡池名稱：
-<input type="text" id="pool">
+卡片名稱： <input type="text" id="card">
 
-卡片名稱：
-<input type="text" id="card">
+等級： <select id="rarity">
 
-等級：
-<select id="rarity">
   <option>SSR</option>
   <option>SSS</option>
-</select>
+</select>是否活動卡： <select id="event">
 
-是否活動卡：
-<select id="event">
   <option>是</option>
   <option>否</option>
-</select>
-
-已抽：
-<input type="number" id="count">
+</select>已抽： <input type="number" id="count">
 
 <button onclick="addRecord()">新增</button>
 
-<h3 id="pityDisplay"></h3>
-
-<table>
+<h3 id="pityDisplay"></h3><br>
+<button onclick="exportData()">📤 匯出資料</button>
+<input type="file" id="importFile" onchange="importData()"><table>
 <thead>
 <tr>
 <th>活動區間</th>
@@ -102,12 +79,8 @@ th, td {
 <th>剩餘保底</th>
 <th>操作</th>
 </tr>
-</thead>
-
-<tbody id="list"></tbody>
-</table>
-
-<script>
+</thead><tbody id="list"></tbody>
+</table><script>
 // ===== 資料 =====
 let data = JSON.parse(localStorage.getItem("gachaData")) || [];
 
@@ -236,6 +209,44 @@ function resetAll(){
   }
 }
 
+// ===== 匯出 =====
+function exportData(){
+  let blob = new Blob([JSON.stringify(data)], {type:"application/json"});
+  let a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "gacha_backup.json";
+  a.click();
+}
+
+// ===== 匯入（合併模式） =====
+function importData(){
+  let file = document.getElementById("importFile").files[0];
+  if(!file) return;
+
+  let reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      let imported = JSON.parse(e.target.result);
+
+      let existingSet = new Set(data.map(d => JSON.stringify(d)));
+
+      imported.forEach(d => {
+        let str = JSON.stringify(d);
+        if(!existingSet.has(str)){
+          data.push(d);
+        }
+      });
+
+      save();
+      render();
+      alert("✅ 匯入完成（已自動合併，不會覆蓋）");
+    }catch(err){
+      alert("❌ 匯入失敗，請確認檔案格式");
+    }
+  };
+  reader.readAsText(file);
+}
+
 // ===== DOM =====
 const startInput = document.getElementById("start");
 const endInput = document.getElementById("end");
@@ -251,7 +262,5 @@ const status = document.getElementById("status");
 
 // ===== 啟動 =====
 render();
-</script>
-
-</body>
+</script></body>
 </html>
